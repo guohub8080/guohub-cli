@@ -5,29 +5,13 @@ import * as net from "node:net";
 import * as path from "node:path";
 import { parse as parseToml } from "smol-toml";
 import { guohub_logger, guohub_json_print, guohub_error_print } from "#common_js/log.js";
+import { findBrowser } from "#common_js/find_browser.js";
 
 const HERE = path.dirname(new URL(import.meta.url).pathname);
 const PROFILES_TOML = path.join(HERE, "config.toml");
 const LOCAL_DATA_DIR = path.join(HERE, "local_data");
 
 const PROCESS_NAMES = ["chrome", "chromium", "msedge", "edge", "brave"];
-
-const BROWSER_PATHS: Record<string, Record<string, string[]>> = {
-  chrome: {
-    darwin: ["/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"],
-    win32: [
-      "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-      "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
-    ],
-  },
-  edge: {
-    darwin: ["/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"],
-    win32: [
-      "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
-      "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
-    ],
-  },
-};
 
 // ─── Config ──
 
@@ -41,16 +25,6 @@ function resolveUserDataDir(projectName: string): string {
   const dir = path.join(LOCAL_DATA_DIR, projectName);
   fs.mkdirSync(dir, { recursive: true });
   return dir;
-}
-
-// ─── Browser discovery ──
-
-function findBrowser(browserName: string): string {
-  const candidates = BROWSER_PATHS[browserName]?.[process.platform] || [];
-  for (const p of candidates) {
-    if (fs.existsSync(p)) return p;
-  }
-  guohub_error_print(`找不到 ${browserName}，请手动指定路径：--browser-path <路径>`);
 }
 
 // ─── Network / CDP ──
@@ -94,7 +68,17 @@ async function waitForCdp(port: number, timeout = 10000): Promise<Record<string,
 // ─── PID / process discovery ──
 
 function findPidListeningOnPort(port: number): number | null {
-  if (process.platform !== "win32") {
+  if (process.platform === "win32") {
+    try {
+      const result = child_process.execSync(
+        `netstat -aon -p TCP | findstr :${port} | findstr LISTENING`,
+        { encoding: "utf-8", timeout: 3000 },
+      );
+      const parts = result.trim().split(/\s+/);
+      const pid = parseInt(parts[parts.length - 1]);
+      if (!isNaN(pid)) return pid;
+    } catch { /* empty */ }
+  } else {
     try {
       const result = child_process.execSync(
         `lsof -i :${port} -sTCP:LISTEN -t -n -P 2>/dev/null`,
@@ -141,7 +125,7 @@ function listProcesses(): PsEntry[] {
 
 interface ExistingInstance { port: number; pid: number; browser: string; }
 
-function findExistingInstance(userDataDir: string): ExistingInstance | null {
+async function findExistingInstance(userDataDir: string): Promise<ExistingInstance | null> {
   const targetUd = path.resolve(userDataDir).toLowerCase();
   const procs = listProcesses();
 
@@ -151,41 +135,19 @@ function findExistingInstance(userDataDir: string): ExistingInstance | null {
     if (cmdLower.includes("helper")) continue;
 
     const args = proc.args;
-    let port: number | null = null;
-    let procUd: string | null = null;
-
-    for (const arg of args.split(/\s+/)) {
-      if (arg.startsWith("--remote-debugging-port=")) {
-        port = parseInt(arg.split("=")[1]);
-      }
-      if (arg.startsWith("--user-data-dir=")) {
-        procUd = path.resolve(arg.split("=", 1)[1] || arg.substring(16)).toLowerCase();
-      }
-    }
-
-    // Also handle args with = syntax in single token
     const portMatch = args.match(/--remote-debugging-port=(\d+)/);
     const udMatch = args.match(/--user-data-dir=(\S+)/);
 
-    if (portMatch) port = parseInt(portMatch[1]);
-    if (udMatch) procUd = path.resolve(udMatch[1]).toLowerCase();
+    if (!portMatch || !udMatch) continue;
+
+    const port = parseInt(portMatch[1]);
+    const procUd = path.resolve(udMatch[1]).toLowerCase();
 
     if (port && procUd === targetUd) {
-      // Verify CDP is alive synchronously
-      try {
-        const result = child_process.execSync(
-          `curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:${port}/json/version`,
-          { encoding: "utf-8", timeout: 2000 },
-        );
-        if (result.trim() === "200") {
-          const info = JSON.parse(
-            child_process.execSync(`curl -s http://127.0.0.1:${port}/json/version`, {
-              encoding: "utf-8", timeout: 2000,
-            }),
-          );
-          return { port, pid: proc.pid, browser: info.Browser || "" };
-        }
-      } catch { /* CDP not alive */ }
+      const info = await queryCdpVersion(port);
+      if (info) {
+        return { port, pid: proc.pid, browser: (info.Browser as string) || "" };
+      }
     }
   }
   return null;
@@ -215,6 +177,14 @@ function isDaemonRunning(cdpPort: number, projectName: string): boolean {
   });
 }
 
+function loadDaemonInfo(projectName: string): Record<string, string> {
+  const infoPath = path.join(LOCAL_DATA_DIR, projectName, ".daemon_info.json");
+  if (!fs.existsSync(infoPath)) return {};
+  try {
+    return JSON.parse(fs.readFileSync(infoPath, "utf-8"));
+  } catch { return {}; }
+}
+
 async function startDaemon(cdpPort: number, chromePid: number, projectName: string): Promise<Record<string, string>> {
   const daemonScript = path.join(HERE, "browser_daemon.ts");
   if (!fs.existsSync(daemonScript)) return {};
@@ -234,6 +204,9 @@ async function startDaemon(cdpPort: number, chromePid: number, projectName: stri
         try {
           const info = JSON.parse(output.trim());
           proc.stdout.destroy();
+          // Save daemon info to file for later reads
+          const infoPath = path.join(LOCAL_DATA_DIR, projectName, ".daemon_info.json");
+          fs.writeFileSync(infoPath, JSON.stringify(info));
           resolve(info);
         } catch {
           resolve({});
@@ -250,21 +223,31 @@ async function startDaemon(cdpPort: number, chromePid: number, projectName: stri
   });
 }
 
-// ─── Open URL via CDP WebSocket ──
+// ─── Open URL via daemon ──
 
-async function openUrlInExisting(cdpPort: number, url: string, tabIndex?: number, replace?: boolean) {
-  const ws = await import("ws");
+async function openUrlInExisting(daemonInfo: Record<string, string>, cdpPort: number, url: string, tabIndex?: number, replace?: boolean) {
+  // Use daemon's /open-tab endpoint when available (createTarget → attach → enable → navigate)
+  if (daemonInfo.open_tab_url) {
+    const params = new URLSearchParams({ url });
+    if (tabIndex !== undefined) params.set("tab_index", String(tabIndex));
+    const resp = await fetch(`${daemonInfo.open_tab_url}?${params}`);
+    const result = await resp.json() as Record<string, unknown>;
+    if (result.error) {
+      guohub_error_print(`打开标签页失败: ${result.error}`);
+    }
+    return;
+  }
 
-  // Get page targets
-  const targetsResp = await fetch(`http://127.0.0.1:${cdpPort}/json/list`);
-  const targets = (await targetsResp.json() as Array<Record<string, unknown>>)
-    .filter((t) => t.type === "page");
-
+  // Fallback: direct CDP for cases where daemon is not running
   if (tabIndex !== undefined) {
+    const targetsResp = await fetch(`http://127.0.0.1:${cdpPort}/json/list`);
+    const targets = (await targetsResp.json() as Array<Record<string, unknown>>)
+      .filter((t) => t.type === "page");
     if (tabIndex < 0 || tabIndex >= targets.length) {
       guohub_error_print(`标签页索引 ${tabIndex} 超出范围，当前共 ${targets.length} 个标签页`);
     }
     const target = targets[tabIndex];
+    const ws = await import("ws");
     const pageWs = new ws.default(target.webSocketDebuggerUrl as string, { maxPayload: 10 * 1024 * 1024 });
     await new Promise<void>((resolve, reject) => {
       pageWs.on("open", () => {
@@ -275,7 +258,6 @@ async function openUrlInExisting(cdpPort: number, url: string, tabIndex?: number
       setTimeout(() => { pageWs.close(); resolve(); }, 3000);
     });
   } else {
-    // Create new tab via HTTP /json/new (avoids WS conflict with daemon's setAutoAttach)
     await fetch(`http://127.0.0.1:${cdpPort}/json/new?${encodeURIComponent(url)}`, { method: "PUT" });
   }
 }
@@ -298,7 +280,7 @@ function buildResult(project: string, port: number, pid: number | null, browser:
   if (chromeArgs.length) result.chrome_args = chromeArgs;
 
   // Daemon endpoints
-  for (const key of ["api_url", "resources_url", "console_log_url", "download_on_url", "download_off_url"]) {
+  for (const key of ["api_url", "resources_url", "console_log_url", "open_tab_url", "download_on_url", "download_off_url"]) {
     if (daemonInfo[key]) result[key] = daemonInfo[key];
   }
 
@@ -343,7 +325,7 @@ export async function main(args: string[]) {
   cleanLockFiles(userDataDir);
 
   // Check for existing instance
-  const existing = findExistingInstance(userDataDir);
+  const existing = await findExistingInstance(userDataDir);
   if (existing) {
     guohub_logger.info(`项目 [${projectName}] 已有运行实例，复用`);
     let daemonInfo: Record<string, string> = {};
@@ -351,6 +333,8 @@ export async function main(args: string[]) {
     if (!isDaemonRunning(existing.port, projectName)) {
       guohub_logger.info("守护进程未运行，重新启动");
       daemonInfo = await startDaemon(existing.port, existing.pid, projectName);
+    } else {
+      daemonInfo = loadDaemonInfo(projectName);
     }
 
     const result = buildResult(projectName, existing.port, existing.pid, existing.browser,
@@ -358,7 +342,7 @@ export async function main(args: string[]) {
 
     if (openUrl) {
       guohub_logger.info(`在已有实例中打开 ${openUrl}`);
-      await openUrlInExisting(existing.port, openUrl, tabIndex, replace);
+      await openUrlInExisting(daemonInfo, existing.port, openUrl, tabIndex, replace);
       result.opened_url = openUrl;
     }
 
@@ -367,7 +351,12 @@ export async function main(args: string[]) {
   }
 
   // Launch new browser
-  if (!browserPath) browserPath = findBrowser(browserName);
+  if (!browserPath) {
+    browserPath = findBrowser(browserName);
+    if (!browserPath) {
+      guohub_error_print(`找不到 ${browserName}，请手动指定路径：--browser-path <路径>`);
+    }
+  }
 
   const port = await findFreePort();
   const cmd = [
@@ -407,4 +396,19 @@ export async function main(args: string[]) {
   );
 
   guohub_json_print(result);
+}
+
+export async function findBrowserPath(args: string[]) {
+  let browserName = "chrome";
+  let i = 0;
+  while (i < args.length) {
+    if (args[i] === "--browser" && i + 1 < args.length) { browserName = args[++i]; }
+    i++;
+  }
+  const found = findBrowser(browserName);
+  if (found) {
+    guohub_json_print({ browser: browserName, path: found });
+  } else {
+    guohub_error_print(`找不到 ${browserName}，请手动指定路径：--browser-path <路径>`);
+  }
 }

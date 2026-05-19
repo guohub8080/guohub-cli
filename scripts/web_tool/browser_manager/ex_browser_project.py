@@ -88,6 +88,11 @@ def cmd_list():
     guohub_json_print({"count": len(projects), "projects": projects})
 
 
+def _detect_browser_path(browser_name: str) -> str:
+    from scripts.common_py.find_browser import find_browser
+    return find_browser(browser_name)
+
+
 def cmd_add(args):
     project_name = None
     description = ""
@@ -115,6 +120,15 @@ def cmd_add(args):
 
     if not project_name:
         guohub_error_print("请指定项目名称: ex-browser-project add <项目名> [选项]")
+
+    target_browser = browser or "chrome"
+
+    # Auto-detect browser path if not specified
+    if not browser_path:
+        detected = _detect_browser_path(target_browser)
+        if detected:
+            browser_path = detected
+            guohub_logger.info(f"自动探测到浏览器路径: {browser_path}")
 
     config = {}
     if description: config["description"] = description

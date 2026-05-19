@@ -149,6 +149,10 @@ const coreCommands: Record<string, { desc: string; run: CommandRun }> = {
     desc: "使用浏览器实例（已存在则复用，不存在则启动，可指定 --open-url 打开页面）",
     run: async (args) => { (await import("./scripts/web_tool/browser_manager/browser_manager.js")).main(args); },
   },
+  "find-browser-path": {
+    desc: "探测浏览器安装路径（--browser chrome|chromium|edge|brave）",
+    run: async (args) => { (await import("./scripts/web_tool/browser_manager/browser_manager.js")).findBrowserPath(args); },
+  },
   "ex-browser-project": {
     desc: "管理浏览器项目（list / add / remove / info）",
     run: (args) => runPython("scripts/web_tool/browser_manager/ex_browser_project.py", args),
