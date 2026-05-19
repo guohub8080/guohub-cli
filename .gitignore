@@ -1,0 +1,20 @@
+dev_temp/
+dist/
+.venv/
+__pycache__/
+node_modules/
+config.json
+**/config.toml
+CLAUDE.md
+.claude/
+.playwright
+.node-version
+.env
+.DS_Store
+**/local_data*/
+**/.playwright-cli/
+
+# 插件目录：忽略所有内容，只保留骨架文件
+plugins/*
+!plugins/.gitkeep
+!plugins/README.md
