@@ -1,13 +1,17 @@
 import { chromium } from "playwright";
 import { guohub_logger, guohub_json_print, guohub_error_print, guohub_text_print } from "#common_js/log.js";
+import { join } from "node:path";
+import { mkdirSync, writeFileSync } from "node:fs";
 
 function parseArgs(args: string[]) {
   let cdpPort: number | null = null;
   let domain = "";
+  let project = "";
+  let save = false;
   let format: "json" | "header" | "name-value" | "curl" = "json";
   let storage: "cookie" | "localStorage" | "sessionStorage" | "all" = "all";
   let authType: "auto" | "bearer" | "cookie" | "apikey" | "basic" | "custom" = "auto";
-  let authHeader = ""; // LLM 从 API 分析中发现的完整请求头值
+  let authHeader = "";
 
   for (let i = 0; i < args.length; i++) {
     switch (args[i]) {
@@ -16,6 +20,12 @@ function parseArgs(args: string[]) {
         break;
       case "--domain":
         domain = args[++i];
+        break;
+      case "--project":
+        project = args[++i];
+        break;
+      case "--save":
+        save = true;
         break;
       case "--format":
         format = args[++i] as "json" | "header" | "name-value" | "curl";
@@ -32,7 +42,7 @@ function parseArgs(args: string[]) {
     }
   }
 
-  return { cdpPort, domain, format, storage, authType, authHeader };
+  return { cdpPort, domain, project, save, format, storage, authType, authHeader };
 }
 
 // ─── 值特征检测 ──
@@ -143,7 +153,7 @@ function findAuthByType(
 }
 
 export async function main(args: string[]) {
-  const { cdpPort, domain, save, format, storage, authType, authHeader } = parseArgs(args);
+  const { cdpPort, domain, project, save, format, storage, authType, authHeader } = parseArgs(args);
 
   if (!domain) {
     guohub_error_print("缺少 --domain 参数，例如: --domain app.yourmusic.fun");
@@ -263,9 +273,20 @@ export async function main(args: string[]) {
   result.suggestedHeaders = headers;
 
   if (save) {
-    const key = `auth_${domain.replace(/[^a-zA-Z0-9]/g, "_")}`;
-    await setCredential(key, JSON.stringify(result));
-    guohub_logger.info(`已保存到 keyring: ${key}`);
+    if (!project) {
+      guohub_error_print("--save 需要指定 --project 参数");
+    }
+    const root = process.env.GUOHUB_ROOT;
+    if (!root) {
+      guohub_error_print("GUOHUB_ROOT 未设置");
+    }
+    const ts = new Date().toISOString().replace(/[:T]/g, "-").slice(0, 19);
+    const fileName = `auth_${domain.replace(/[^a-zA-Z0-9]/g, "_")}_${ts}.json`;
+    const dir = join(root, "scripts/web_tool/browser_manager/local_data", project, "auth");
+    const filePath = join(dir, fileName);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(filePath, JSON.stringify(result, null, 2), "utf-8");
+    guohub_logger.info(`已保存: ${filePath}`);
   }
 
   // ─── 输出 ──

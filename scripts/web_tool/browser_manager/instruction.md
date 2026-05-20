@@ -169,6 +169,45 @@ curl <api_url>
 
 守护进程会自动记录页面上所有网络请求。在浏览器里操作后，再次 curl 即可看到新增的请求。
 
+## 场景 6：我想提取当前登录态，供后续脚本直接调用 API
+
+```bash
+# 提取认证信息（Cookie + LocalStorage + SessionStorage）
+guohub-cli extract-auth --domain app.yourmusic.fun --cdp-port 59615 --project default
+
+# 保存到 local_data/<project>/auth/ 目录
+guohub-cli extract-auth --domain app.yourmusic.fun --cdp-port 59615 --project default --save
+
+# 生成 curl 命令
+guohub-cli extract-auth --domain app.yourmusic.fun --cdp-port 59615 --project default --format curl
+```
+
+**流程：**
+1. LLM 先分析 API 请求，确认认证方式（如 `Authorization: Bearer ...`）
+2. LLM 将 `--cdp-port` 和 `--project` 传给 `extract-auth`
+3. 工具连接 CDP，提取 Cookie 和 Storage 中的认证信息
+4. 输出 `suggestedHeaders`，可直接用于后续 API 调用
+
+**保存路径：**
+```
+local_data/<project>/auth/auth_<domain>_<YYYY-MM-DD_HH-mm-ss>.json
+```
+
+**输出示例：**
+```json
+{
+  "domain": "app.yourmusic.fun",
+  "cdp_port": 59615,
+  "cookies": [...],
+  "localStorage": { "auth": {...}, "other": {...} },
+  "sessionStorage": { "auth": {...}, "other": {...} },
+  "suggestedHeaders": {
+    "Cookie": "_ga=...; session=...",
+    "Authorization": "Bearer eyJhbG..."
+  }
+}
+```
+
 ## 场景 6：页面有报错，我想看 Console 日志
 
 ```bash
