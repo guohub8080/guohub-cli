@@ -168,12 +168,87 @@ def check_global_link():
         return False
 
 
+def validate_plugins():
+    """验证所有插件的 plugin.json 语法和入口文件"""
+    plugins_dir = SKILL_ROOT / "plugins"
+    if not plugins_dir.exists():
+        return
+
+    guohub_logger.info("=== 插件检查 ===")
+    has_error = False
+
+    for plugin_dir in plugins_dir.iterdir():
+        if not plugin_dir.is_dir():
+            continue
+
+        meta_path = plugin_dir / "plugin.json"
+        if not meta_path.exists():
+            continue
+
+        plugin_name = plugin_dir.name
+
+        # 1. 解析 JSON
+        try:
+            meta = json.loads(meta_path.read_text("utf-8"))
+        except json.JSONDecodeError as e:
+            guohub_logger.info(f"✗ [{plugin_name}] plugin.json 解析失败：{e}")
+            has_error = True
+            continue
+
+        # 2. 验证必需字段
+        if "name" not in meta:
+            guohub_logger.info(f"✗ [{plugin_name}] 缺少 name 字段")
+            has_error = True
+            continue
+
+        # 3. 验证 commands
+        commands = meta.get("commands", [])
+        if not isinstance(commands, list):
+            guohub_logger.info(f"✗ [{plugin_name}] commands 必须是数组")
+            has_error = True
+            continue
+
+        for cmd in commands:
+            required = ["name", "desc", "type", "entry"]
+            missing = [f for f in required if f not in cmd]
+            if missing:
+                guohub_logger.info(f"✗ [{plugin_name}] 命令缺少字段：{', '.join(missing)}")
+                has_error = True
+                continue
+
+            if cmd["type"] not in ("ts", "py"):
+                guohub_logger.info(f"✗ [{plugin_name}] 命令 {cmd['name']} 的 type 必须是 ts 或 py")
+                has_error = True
+                continue
+
+            # 4. 验证入口文件存在
+            entry_path = plugin_dir / cmd["entry"]
+            if not entry_path.exists():
+                guohub_logger.info(f"✗ [{plugin_name}] 入口文件不存在：{cmd['entry']}")
+                has_error = True
+                continue
+
+        # 5. 检查 npm 依赖
+        pkg_path = plugin_dir / "package.json"
+        if pkg_path.exists():
+            pkg = json.loads(pkg_path.read_text("utf-8"))
+            deps = pkg.get("dependencies", {})
+            if deps:
+                guohub_logger.info(f"  [{plugin_name}] npm 依赖：{', '.join(deps.keys())}")
+
+        guohub_logger.info(f"✓ [{plugin_name}] {len(commands)} 个命令")
+
+    if not has_error:
+        guohub_logger.info("所有插件验证通过")
+
+
 def main():
     check_env()
     check_global_link()
     check_pandoc()
     ensure_dependencies()
     scan_plugin_dependencies()
+    validate_plugins()
     guohub_json_print({"status": "ready"})
 
 
