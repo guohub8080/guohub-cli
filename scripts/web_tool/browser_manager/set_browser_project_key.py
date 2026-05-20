@@ -4,8 +4,8 @@ import sys
 from pathlib import Path
 
 from scripts.common_py.clipboard import (
-    guohub_skill_clipboard_clear,
-    guohub_skill_clipboard_read,
+    guohub_clipboard_clear,
+    guohub_clipboard_read,
 )
 from scripts.common_py.keyring_helper import guohub_set_credential
 from scripts.common_py.log import (
@@ -118,7 +118,7 @@ def main():
 
     if set_value:
         if from_clipboard:
-            value = guohub_skill_clipboard_read()
+            value = guohub_clipboard_read()
             if not value:
                 guohub_error_print("剪贴板为空")
             guohub_logger.info(f"从剪贴板读取到值: {value[:4]}***")
@@ -129,7 +129,7 @@ def main():
         guohub_set_credential(keyring_name, value)
         guohub_logger.info(f"已存入 keyring: {keyring_name}")
         if from_clipboard:
-            guohub_skill_clipboard_clear()
+            guohub_clipboard_clear()
             guohub_logger.info("已清空剪贴板")
 
     guohub_json_print(

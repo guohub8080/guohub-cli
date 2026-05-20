@@ -2,7 +2,7 @@ import subprocess
 import sys
 
 
-def guohub_skill_clipboard_read() -> str:
+def guohub_clipboard_read() -> str:
     """读取系统剪贴板内容，失败返回空字符串。"""
     try:
         if sys.platform == "darwin":
@@ -17,7 +17,7 @@ def guohub_skill_clipboard_read() -> str:
     return ""
 
 
-def guohub_skill_clipboard_write(text: str):
+def guohub_clipboard_write(text: str):
     """写入系统剪贴板。"""
     if sys.platform == "darwin":
         subprocess.run(["pbcopy"], input=text, text=True, check=True)
@@ -25,6 +25,6 @@ def guohub_skill_clipboard_write(text: str):
         subprocess.run(["clip"], input=text, text=True, check=True)
 
 
-def guohub_skill_clipboard_clear():
+def guohub_clipboard_clear():
     """清空系统剪贴板。"""
-    guohub_skill_clipboard_write("")
+    guohub_clipboard_write("")

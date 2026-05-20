@@ -20,7 +20,7 @@ export function runPython(scriptPath: string, args: string[] = []) {
 
   if (!checkUv()) {
     process.stderr.write(
-      "[GuoHub Skill] Python 环境未就绪\n\n" +
+      "[guohub-cli] Python 环境未就绪\n\n" +
       "本项目部分功能需要 Python 环境，检测到以下问题：\n" +
       "  ✗ 未找到 uv（Python 包管理器）\n\n" +
       "请按以下步骤初始化：\n" +
@@ -34,7 +34,7 @@ export function runPython(scriptPath: string, args: string[] = []) {
 
   if (!checkVenv(root)) {
     process.stderr.write(
-      "[GuoHub Skill] Python 虚拟环境未初始化\n\n" +
+      "[guohub-cli] Python 虚拟环境未初始化\n\n" +
       "检测到 uv 已安装，但 .venv 目录不存在。\n\n" +
       "请执行初始化：\n" +
       "  pnpm dev doctor\n\n" +
