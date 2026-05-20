@@ -161,6 +161,10 @@ const coreCommands: Record<string, { desc: string; run: CommandRun }> = {
     desc: "安全关闭指定项目的浏览器实例和守护进程",
     run: (args) => runPython("scripts/web_tool/browser_manager/ex_browser_close.py", args),
   },
+  "extract-auth": {
+    desc: "从浏览器提取指定域名的认证信息（Cookie + LocalStorage + SessionStorage）",
+    run: async (args) => { (await import("./scripts/web_tool/extract_auth.js")).main(args); },
+  },
 };
 
 // 动态加载插件命令
