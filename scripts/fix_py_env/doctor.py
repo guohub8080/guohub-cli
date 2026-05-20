@@ -126,7 +126,7 @@ def check_pandoc():
 
 
 def check_env():
-    guohub_logger.info("=== GuoHub Skill 环境检查 ===")
+    guohub_logger.info("=== guohub-cli 环境检查 ===")
 
     venv = SKILL_ROOT / ".venv"
     if venv.exists():
