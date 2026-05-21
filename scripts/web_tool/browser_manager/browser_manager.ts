@@ -7,7 +7,8 @@ import { parse as parseToml } from "smol-toml";
 import { guohub_logger, guohub_json_print, guohub_error_print } from "#common_js/log.js";
 import { findBrowser } from "#common_js/find_browser.js";
 
-const HERE = path.dirname(new URL(import.meta.url).pathname);
+import { fileURLToPath } from "node:url";
+const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PROFILES_TOML = path.join(HERE, "config.toml");
 const LOCAL_DATA_DIR = path.join(HERE, "local_data");
 
