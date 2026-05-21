@@ -83,7 +83,7 @@ const coreCommands: Record<string, { desc: string; run: CommandRun }> = {
   // Python commands
   "doctor": {
     desc: "安装依赖并配置凭据",
-    run: (args) => runPython("scripts/fix_py_env/doctor.py", args),
+    run: async (args) => { (await import("./scripts/fix_py_env/doctor.js")).main(args); },
   },
   "extract-img": {
     desc: "从 Word 文档中提取图片",
