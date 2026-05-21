@@ -191,11 +191,12 @@ async function startDaemon(cdpPort: number, chromePid: number, projectName: stri
   if (!fs.existsSync(daemonScript)) return {};
 
   const root = process.env.GUOHUB_ROOT || "";
-  const tsx = path.join(root, "node_modules", ".bin", "tsx");
+  const tsx = path.join(root, "node_modules", ".bin", process.platform === "win32" ? "tsx.cmd" : "tsx");
 
   return new Promise((resolve) => {
     const proc = child_process.spawn(tsx, [daemonScript, String(cdpPort), String(chromePid), projectName], {
       stdio: ["ignore", "pipe", "ignore"],
+      shell: process.platform === "win32",
     });
 
     let output = "";
@@ -365,6 +366,8 @@ export async function main(args: string[]) {
     `--remote-debugging-port=${port}`,
     "--remote-allow-origins=*",
     `--user-data-dir=${userDataDir}`,
+    "--no-first-run",
+    "--no-default-browser-check",
   ];
   if (proxy) cmd.push(`--proxy-server=${proxy}`);
   cmd.push(...chromeArgs);
@@ -373,7 +376,8 @@ export async function main(args: string[]) {
   guohub_logger.info(`项目 [${projectName}] 启动 ${browserName}: ${browserPath}`);
   child_process.spawn(cmd[0], cmd.slice(1), {
     stdio: "ignore",
-    detached: process.platform !== "win32",
+    detached: true,
+    windowsHide: process.platform === "win32",
   }).unref();
 
   guohub_logger.info("等待 CDP 端口就绪...");
