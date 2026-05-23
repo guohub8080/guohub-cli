@@ -27,6 +27,10 @@ const coreCommands: Record<string, { desc: string; run: CommandRun }> = {
     desc: "生成随机密码",
     run: async (args) => { (await import("./scripts/system_tool/gen_password/script.js")).main(args); },
   },
+  "gen-uuid": {
+    desc: "生成 UUID v4（--count N，--upper 大写，--hex 去连字符，--to-clipboard 复制到剪贴板）",
+    run: async (args) => { (await import("./scripts/system_tool/gen_uuid.js")).main(args); },
+  },
   "open-folder": {
     desc: "在文件管理器中打开文件夹",
     run: async (args) => { (await import("./scripts/system_tool/open_folder/script.js")).main(args); },
