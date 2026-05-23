@@ -165,6 +165,10 @@ const coreCommands: Record<string, { desc: string; run: CommandRun }> = {
     desc: "从浏览器提取指定域名的认证信息（Cookie + LocalStorage + SessionStorage）",
     run: async (args) => { (await import("./scripts/web_tool/extract_auth.js")).main(args); },
   },
+  "check-wechat-svg": {
+    desc: "检查 SVG 代码中是否有微信公众号不支持的动画属性（依据 T/CASME 1609—2024）",
+    run: async (args) => { (await import("./scripts/web_tool/check_wechat_svg.js")).main(args); },
+  },
 };
 
 // 动态加载插件命令
