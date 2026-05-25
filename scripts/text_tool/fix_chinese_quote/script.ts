@@ -74,16 +74,21 @@ export function main(args: string[]) {
   let fromClipboard = false;
   let toClipboard = false;
   let checkOnly = false;
+  let textArg: string | null = null;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "-f" || args[i] === "--file") fromFile = args[++i];
     else if (args[i] === "--from-clipboard") fromClipboard = true;
     else if (args[i] === "--to-clipboard") toClipboard = true;
     else if (args[i] === "--check") checkOnly = true;
+    else if (args[i] === "--text") textArg = args[++i];
+    else if (!args[i].startsWith("-") && !textArg) textArg = args[i];
   }
 
   let text: string;
-  if (fromFile) {
+  if (textArg) {
+    text = textArg;
+  } else if (fromFile) {
     const p = resolve(fromFile);
     if (!existsSync(p)) guohub_error_print(`文件不存在：${p}`);
     text = readFileSync(p, "utf-8");
@@ -92,7 +97,7 @@ export function main(args: string[]) {
   } else if (!process.stdin.isTTY) {
     text = readFileSync(0, "utf-8");
   } else {
-    guohub_error_print("请指定输入来源：-f <文件> / --from-clipboard / 管道输入");
+    guohub_error_print("请指定输入来源：--text <文本> / -f <文件> / --from-clipboard / 管道输入");
   }
 
   if (checkOnly) {

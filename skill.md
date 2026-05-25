@@ -176,6 +176,7 @@ guohub-cli trim-transparent <目录/>              # 批量处理
 将英文直引号转为中文弯引号，并可检查引号是否闭合。
 
 ```bash
+guohub-cli fix-chinese-quote --text "<文本>"                        # 直接传入文本
 guohub-cli fix-chinese-quote --file <文件>                         # 从文件修复
 guohub-cli fix-chinese-quote --from-clipboard --to-clipboard       # 剪贴板进出
 echo '<文本>' | guohub-cli fix-chinese-quote                       # 管道输入
@@ -184,7 +185,7 @@ guohub-cli fix-chinese-quote --check --file <文件>                  # 只检�
 
 - 修复模式：直引号交替转为左右弯引号
 - 检查模式（`--check`）：检测未闭合等问题，有问题 exit 1，通过 exit 0
-- 支持文件、剪贴板、管道三种输入
+- 支持 `--text`、文件、剪贴板、管道四种输入
 
 ### 文档处理（doc_tool）
 
