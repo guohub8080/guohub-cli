@@ -6,6 +6,16 @@ import { runPython } from "./scripts/common_js/run_python.js";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 
+// 入口检测：只允许通过 guohub-cli（bin.js）
+{
+  const fromBinJs = process.env.GUOHUB_CLI_ENTRY === "bin.js";
+  if (!fromBinJs) {
+    process.stderr.write(
+      "\x1b[33m⚠️  请通过 guohub-cli 调用，而非其他方式。\n   全局安装：npm link\n   使用方式：guohub-cli <command>\x1b[0m\n"
+    );
+  }
+}
+
 // 计算项目根目录并注入到进程环境变量，所有子模块和 Python 子进程都能读到
 let dir = currentDir;
 while (!existsSync(join(dir, "pyproject.toml"))) {

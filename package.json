@@ -6,7 +6,7 @@
     "guohub-cli": "./bin.js"
   },
   "scripts": {
-    "dev": "tsx cli.ts",
+    "dev": "node bin.js",
     "postinstall": "tsx cli.ts doctor"
   },
   "imports": {
