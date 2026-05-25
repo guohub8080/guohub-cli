@@ -1,7 +1,30 @@
 #!/usr/bin/env node
 import { execFileSync } from "node:child_process";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+
+const rawEntry = process.argv[1] || "";
+const entryName = basename(rawEntry).toLowerCase();
+const projectDir = dirname(fileURLToPath(import.meta.url)).toLowerCase();
+
+// 只有直接调用项目内的 bin.js 才检测（排除全局 guohub-cli、npx wrapper 等）
+const isDirectProjectCall =
+  entryName === "bin.js" &&
+  (rawEntry === "bin.js" || rawEntry === "./bin.js" || rawEntry.toLowerCase().startsWith(projectDir));
+
+if (isDirectProjectCall) {
+  try {
+    execFileSync(
+      process.platform === "win32" ? "where" : "which",
+      ["guohub-cli"],
+      { encoding: "utf8", stdio: "pipe" }
+    );
+  } catch {
+    console.warn(
+      "\x1b[33m⚠️  guohub-cli 未注册为全局命令，建议执行：npm link\x1b[0m"
+    );
+  }
+}
 
 const dir = dirname(fileURLToPath(import.meta.url));
 const node = process.execPath;
