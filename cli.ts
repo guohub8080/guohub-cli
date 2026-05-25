@@ -173,6 +173,10 @@ const coreCommands: Record<string, { desc: string; run: CommandRun }> = {
     desc: "检查 SVG 代码中是否有微信公众号不支持的动画属性（依据 T/CASME 1609—2024）",
     run: async (args) => { (await import("./scripts/web_tool/check_wechat_svg.js")).main(args); },
   },
+  "unlock-wechat-file": {
+    desc: "解除微信下载文件的只读限制和安全标记（支持 Windows 只读属性/Zone.Identifier 和 macOS 权限/quarantine）",
+    run: async (args) => { (await import("./scripts/system_tool/unlock_wechat_file.js")).main(args); },
+  },
 };
 
 // 动态加载插件命令

@@ -3,12 +3,27 @@ import ctypes
 import os
 import platform
 import sys
+import time
 from pathlib import Path
 
 from scripts.common_py.log import guohub_error_print, guohub_success_print
 
 
-def _trash_windows(paths: list[str]):
+def _count_items(paths: list[str]) -> int:
+    """统计路径下的文件和文件夹总数"""
+    total = 0
+    for p in paths:
+        path = Path(p)
+        if not path.exists():
+            continue
+        if path.is_file():
+            total += 1
+        else:
+            total += sum(1 for _ in path.rglob("*")) + 1
+    return total
+
+
+def _trash_windows(paths: list[str], silent: bool = False):
     """Windows: 使用 SHFileOperationW 移动到回收站"""
     from ctypes import wintypes
 
@@ -40,7 +55,10 @@ def _trash_windows(paths: list[str]):
     op = SHFILEOPSTRUCTW()
     op.wFunc = FO_DELETE
     op.pFrom = pfrom
-    op.fFlags = FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_SILENT
+    flags = FOF_ALLOWUNDO | FOF_NOCONFIRMATION
+    if silent:
+        flags |= FOF_SILENT
+    op.fFlags = flags
 
     result = SHFileOperationW(ctypes.byref(op))
     if result != 0:
@@ -57,7 +75,7 @@ def _trash_macos(paths: list[str]):
         subprocess.run(["osascript", "-e", script], check=True)
 
 
-def safe_delete(paths: list[str]) -> tuple[int, list[str]]:
+def safe_delete(paths: list[str], silent: bool = False) -> tuple[int, list[str]]:
     """安全删除（移动到回收站/废纸篓），返回 (成功数, 失败列表)"""
     system = platform.system()
 
@@ -73,7 +91,7 @@ def safe_delete(paths: list[str]) -> tuple[int, list[str]]:
         return 0, []
 
     if system == "Windows":
-        _trash_windows(existing)
+        _trash_windows(existing, silent=silent)
     elif system == "Darwin":
         _trash_macos(existing)
     else:
@@ -85,10 +103,16 @@ def safe_delete(paths: list[str]) -> tuple[int, list[str]]:
 def main(args):
     parser = argparse.ArgumentParser(description="安全删除文件/文件夹（移动到回收站/废纸篓）")
     parser.add_argument("paths", nargs="+", help="要删除的文件或文件夹路径")
+    parser.add_argument("--silent", action="store_true", help="静默模式，不显示 Windows 进度对话框")
     parsed = parser.parse_args(args)
 
+    # 统计文件数
+    total = _count_items(parsed.paths)
+    if total > 0:
+        print(f"共 {total} 个文件/文件夹，正在移动到回收站...")
+
     try:
-        success, missing = safe_delete(parsed.paths)
+        success, missing = safe_delete(parsed.paths, silent=parsed.silent)
         if missing and not success:
             guohub_error_print("所有路径均不存在")
         else:
