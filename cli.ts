@@ -1,6 +1,6 @@
 import { program } from "commander";
 import { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { runPython } from "./scripts/common_js/run_python.js";
 
@@ -206,7 +206,7 @@ function loadPlugins(root: string): Record<string, { desc: string; run: CommandR
 
     for (const cmd of meta.commands) {
       if (cmd.type === "ts") {
-        const entryPath = join(pluginDir, cmd.entry);
+        const entryPath = pathToFileURL(join(pluginDir, cmd.entry)).href;
         pluginCommands[cmd.name] = {
           desc: cmd.desc,
           run: async (args) => {

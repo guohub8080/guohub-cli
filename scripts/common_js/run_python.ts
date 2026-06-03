@@ -17,6 +17,8 @@ function checkVenv(root: string): boolean {
 
 export function runPython(scriptPath: string, args: string[] = []) {
   const root = process.env.GUOHUB_ROOT!;
+  const sep = process.platform === "win32" ? ";" : ":";
+  const pythonpath = `${root}${sep}${join(root, "plugins")}`;
 
   if (!checkUv()) {
     process.stderr.write(
@@ -49,7 +51,7 @@ export function runPython(scriptPath: string, args: string[] = []) {
   try {
     execFileSync("uv", ["run", "python", resolve(root, scriptPath), ...args], {
       cwd: root,
-      env: { ...process.env, PYTHONPATH: `${root}${process.platform === "win32" ? ";" : ":"}${join(root, "plugins")}` },
+      env: { ...process.env, PYTHONPATH: pythonpath },
       stdio: "inherit",
     });
   } catch (e: any) {

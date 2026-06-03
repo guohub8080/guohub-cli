@@ -291,6 +291,30 @@ function buildResult(project: string, port: number, pid: number | null, browser:
 
 // ─── Main ──
 
+async function queryCdpTabs(port: number): Promise<Array<{ id: string; title: string; url: string; type: string }>> {
+  return new Promise((resolve) => {
+    const req = http.get(`http://127.0.0.1:${port}/json/list`, { timeout: 2000 }, (res) => {
+      const chunks: Buffer[] = [];
+      res.on("data", (c) => chunks.push(c));
+      res.on("end", () => {
+        try {
+          const list = JSON.parse(Buffer.concat(chunks).toString()) as Array<Record<string, unknown>>;
+          resolve(list
+            .filter((t) => t.type === "page")
+            .map((t) => ({
+              id: (t.id as string) || "",
+              title: (t.title as string) || "",
+              url: (t.url as string) || "",
+              type: (t.type as string) || "",
+            })));
+        } catch { resolve([]); }
+      });
+    });
+    req.on("error", () => resolve([]));
+    req.on("timeout", () => { req.destroy(); resolve([]); });
+  });
+}
+
 export async function main(args: string[]) {
   let projectName = "default";
   let browserName = "";
@@ -298,6 +322,7 @@ export async function main(args: string[]) {
   let openUrl = "";
   let tabIndex: number | undefined;
   let replace = false;
+  let listTabs = false;
 
   let i = 0;
   while (i < args.length) {
@@ -307,6 +332,7 @@ export async function main(args: string[]) {
     else if (args[i] === "--open-url" && i + 1 < args.length) { openUrl = args[++i]; }
     else if (args[i] === "--tab-index" && i + 1 < args.length) { tabIndex = parseInt(args[++i]); }
     else if (args[i] === "--replace") { replace = true; }
+    else if (args[i] === "--list-tabs") { listTabs = true; }
     i++;
   }
 
@@ -341,6 +367,17 @@ export async function main(args: string[]) {
 
     const result = buildResult(projectName, existing.port, existing.pid, existing.browser,
       credentialKeys, description, proxy, chromeArgs, daemonInfo);
+
+    if (listTabs) {
+      const tabs = await queryCdpTabs(existing.port);
+      guohub_logger.info(`当前 ${tabs.length} 个标签页：`);
+      for (let idx = 0; idx < tabs.length; idx++) {
+        const t = tabs[idx];
+        console.log(`  [${idx}] ${t.title}`);
+        console.log(`      ${t.url}`);
+      }
+      result.tabs = tabs;
+    }
 
     if (openUrl) {
       guohub_logger.info(`在已有实例中打开 ${openUrl}`);
@@ -390,6 +427,17 @@ export async function main(args: string[]) {
   const daemonInfo = await startDaemon(port, pid || 0, projectName);
   const result = buildResult(projectName, port, pid, (info?.Browser as string) || "",
     credentialKeys, description, proxy, chromeArgs, daemonInfo);
+
+  if (listTabs) {
+    const tabs = await queryCdpTabs(port);
+    guohub_logger.info(`当前 ${tabs.length} 个标签页：`);
+    for (let idx = 0; idx < tabs.length; idx++) {
+      const t = tabs[idx];
+      console.log(`  [${idx}] ${t.title}`);
+      console.log(`      ${t.url}`);
+    }
+    result.tabs = tabs;
+  }
 
   result.prompt = (
     "以下接口均为 GET 访问。"

@@ -18,3 +18,4 @@ CLAUDE.md
 plugins/*
 !plugins/.gitkeep
 !plugins/README.md
+guohub_cli.egg-info/
