@@ -7,7 +7,7 @@ config.json
 **/config.toml
 CLAUDE.md
 .claude/
-.playwright
+.playwright-mcp/
 .node-version
 .env
 .DS_Store

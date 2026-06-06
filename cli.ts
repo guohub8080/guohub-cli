@@ -99,6 +99,10 @@ const coreCommands: Record<string, { desc: string; run: CommandRun }> = {
     desc: "安装依赖并配置凭据",
     run: async (args) => { (await import("./scripts/fix_py_env/doctor.js")).main(args); },
   },
+  "extract-docx-text": {
+    desc: "从 Word 文档中提取文本",
+    run: (args) => runPython("scripts/doc_tool/extract_docx_text.py", args),
+  },
   "extract-img": {
     desc: "从 Word 文档中提取图片",
     run: (args) => runPython("scripts/doc_tool/extract_img.py", args),

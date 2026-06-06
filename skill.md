@@ -27,6 +27,12 @@ pnpm dev doctor
 - Node.js + pnpm
 - uv 已安装（`uv --version` 检查）
 
+## 插件（Plugins）
+
+`plugins/` 目录下的每个插件有独立的 `skill.md`，声明插件特有的命令和用法。
+
+**重要：当用户的请求在下方核心功能模块中找不到匹配命令时，必须扫描 `plugins/` 下所有 `plugin.json` 和 `skill.md`，检查是否有插件提供了相关命令。** 不要仅凭核心 `cli.ts` 没有注册就认为功能不存在——插件通过独立机制注册命令，同样可以通过 `guohub-cli <命令名>` 调用。
+
 ## 功能模块
 
 ### 系统工具（system_tool）
